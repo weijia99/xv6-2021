@@ -22,6 +22,7 @@ int dup(int);
 int getpid(void);
 char* sbrk(int);
 int sleep(int);
+// 这里已经定义好了
 int uptime(void);
 
 // ulib.c
