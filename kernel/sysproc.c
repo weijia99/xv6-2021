@@ -6,7 +6,7 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
-
+#include "sysinfo.h"
 uint64
 sys_exit(void)
 {
@@ -94,4 +94,49 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+
+uint64
+sys_trace(void)
+{
+  int mask;
+// 这个mask是输入的时候给与的，我们直接使用，不需要自己实现
+if (argint(0, &mask) < 0) {  //获取trace的参数
+        return -1;               //获取失败返回-1
+    }
+    return trace(mask); 
+ 
+//  return 0;
+}
+
+
+// implement sys_sysinfo function
+uint64
+sys_sysinfo(void){
+// 使用copy函数来进行复制到st
+// addr
+   // 剩下的就是复制内容，直接按照提示，看
+// ; see sys_fstat() (kernel/sysfile.c) and filestat(
+  // 调用kalocate求进程还有free，返回，还有写入
+  // 得到当前的进程，然后进行传入数量还有free
+    struct sysinfo info;
+  struct proc *p;
+  uint64 addr;
+  // 通过系统获得addr
+    if (argaddr(0, &addr) < 0) { //获取系统调用传递的指针参数
+      return -1;
+  }
+  // 把信息传递给info
+  p = myproc();
+  // 得到当前进行的信息，然后传入到当前进程
+  info.freemem= getfreemem();
+  info.nproc=procnum();
+  // 复制到用户态,复制内存信息到这个的虚拟地址
+  // 复制info到这个进程的虚拟地址
+  if(copyout(p->pagetable, addr, (char *)&info, sizeof(info)) < 0){
+    return -1;
+  }
+  return 0;
+
 }

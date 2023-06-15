@@ -82,7 +82,11 @@ argstr(int n, char *buf, int max)
     return -1;
   return fetchstr(addr, buf, max);
 }
-
+// 调用字符串，到时候直接进行输出数组
+char *syscalls_name[24] = {
+    "",      "fork",  "exit",   "wait",   "pipe",  "read",  "kill",   "exec",
+    "fstat", "chdir", "dup",    "getpid", "sbrk",  "sleep", "uptime", "open",
+    "write", "mknod", "unlink", "link",   "mkdir", "close", "trace","sysinfo"};
 extern uint64 sys_chdir(void);
 extern uint64 sys_close(void);
 extern uint64 sys_dup(void);
@@ -104,7 +108,11 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
+extern uint64 sys_trace(void);
+extern uint64 sys_sysinfo(void);
 
+
+// 大写的sys，是头文件定义的，extern是集成proc
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
 [SYS_exit]    sys_exit,
@@ -127,6 +135,9 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_trace]   sys_trace,
+[SYS_sysinfo]   sys_sysinfo,
+
 };
 
 void
@@ -137,6 +148,9 @@ syscall(void)
 
   num = p->trapframe->a7;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
+     if(p->mask >> num & 1) {
+      printf("%d: syscall %s -> %d\n",p->pid, syscalls_name[num], p->trapframe->a0);
+    }
     p->trapframe->a0 = syscalls[num]();
   } else {
     printf("%d %s: unknown sys call %d\n",

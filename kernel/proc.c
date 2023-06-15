@@ -140,7 +140,8 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+  // p->mask = 0;
+  // 初始化mask为0
   return p;
 }
 
@@ -294,7 +295,6 @@ fork(void)
 
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
-
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
@@ -302,6 +302,7 @@ fork(void)
   np->cwd = idup(p->cwd);
 
   safestrcpy(np->name, p->name, sizeof(p->name));
+  np->mask = p->mask;
 
   pid = np->pid;
 
@@ -654,3 +655,26 @@ procdump(void)
     printf("\n");
   }
 }
+
+// 具体实现方法
+int trace(int mask) { 
+  struct proc *p = myproc();
+  p->mask = mask;
+  return 0;
+}
+
+
+// Look in the process table for an UNUSED proc.
+int procnum(void) { 
+  struct proc *p;
+  int count = 0;
+  for (p = proc; p < &proc[NPROC]; p++) { //遍历数组
+      acquire(&p->lock); //加锁
+      if(p->state != UNUSED){ //查看状态
+          count++;
+      }
+      release(&p->lock); //解锁
+  }
+  return count;
+}
+ // allocate方法
