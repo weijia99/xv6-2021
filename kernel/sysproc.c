@@ -81,6 +81,61 @@ int
 sys_pgaccess(void)
 {
   // lab pgtbl: your code here.
+  // 获取参数，然后进行执行
+  // 主要思路就是，自己来对于每一个pta来设置
+  uint64 va;
+  int page_nums;
+  uint64 out_addr;
+  // 三个传入的参数，进行获取
+   if(argaddr(0, &va) < 0) {
+    return -1;
+  }
+  if(argint(1, &page_nums) < 0) {
+    return -1;
+  }
+  if(argaddr(2, &out_addr) < 0) {
+    return -1;
+  }
+  // 设置范围
+  if(page_nums<0||page_nums>64){
+    return -1;
+  }
+  // 然后就是对num遍历，查找
+  // 具体看walk函数
+  // 他的要求是从va还有后面的内存进行查找
+  uint64 bitmask = 0;
+  pte_t *pte;
+  struct proc *p = myproc();
+  for (int i = 0; i < page_nums; i++)
+  {
+    /* code */
+    // 通过walk把va变成pte，看能不能找到
+    if(va >=MAXVA){
+      return -1;
+    }
+    pte = walk(p->pagetable,va,0);
+    if (!pte)
+    {
+      /* code */
+      return -1;
+    }
+    if(*pte&PTE_A){
+      // 能够access有效
+      // 进行记录，使用bitmask
+      bitmask |=(1<<i);
+      // 归0，就是让这个a的位置为0
+      *pte ^=PTE_A;
+    }
+    // 最后使用copyout进行返回mask
+    //更新va，+PGSIZE
+    va +=PGSIZE;
+  }
+  // 地址传入
+   if(copyout(p->pagetable,out_addr,(char *)&bitmask,sizeof(bitmask))<0){
+      return -1;
+    }
+  
+  
   return 0;
 }
 #endif
@@ -107,3 +162,4 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+

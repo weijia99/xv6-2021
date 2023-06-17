@@ -20,6 +20,7 @@
 // qemu puts UART registers here in physical memory.
 #define UART0 0x10000000L
 #define UART0_IRQ 10
+// 实际映射布局，与之前的图类似
 
 // virtio mmio interface
 #define VIRTIO0 0x10001000

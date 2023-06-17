@@ -126,7 +126,12 @@ found:
     release(&p->lock);
     return 0;
   }
-
+  if((p->usyspage = (struct usyscall *)kalloc()) == 0) {
+      freeproc(p);
+      release(&p->lock);
+      return 0;
+  }
+  p->usyspage->pid = p->pid;
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
@@ -140,7 +145,8 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+  // Allocate a usyscall page
+  
   return p;
 }
 
@@ -164,6 +170,9 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  // release
+  if (p->usyspage) 
+    kfree((void *)p->usyspage);
 }
 
 // Create a user page table for a given process,
@@ -195,18 +204,29 @@ proc_pagetable(struct proc *p)
     uvmfree(pagetable, 0);
     return 0;
   }
-
+  // 吧id映射到usyspage上面
+  if(mappages(pagetable, USYSCALL, PGSIZE,
+             (uint64)(p->usyspage), PTE_R | PTE_U ) < 0){
+    uvmunmap(pagetable, USYSCALL, 1, 0);
+    uvmfree(pagetable, 0);
+    return 0;
+  }
   return pagetable;
 }
 
 // Free a process's page table, and free the
 // physical memory it refers to.
+// 清楚页表
 void
 proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
+  uvmunmap(pagetable, USYSCALL, 1, 0);
+
   uvmfree(pagetable, sz);
+  // 也要删除那个us
+
 }
 
 // a user program that calls exec("/init")
@@ -654,3 +674,15 @@ procdump(void)
     printf("\n");
   }
 }
+
+// pid进行映射
+// 算了，看了那么多，说点人话解释一下吧… 正常情况下如果我们需要获得当前进程的 PID，
+// 我们需要执行系统调用，切到内核态，从 proc 结构体里头把 pid 读出来…
+
+// 现在的意思是说我们可以在内存中开辟一块空间，
+// 准确的来说是一个 struct usyscall 结构体，里面包装了一个 pid 的整型变量。
+// 我们在内核中创建一个新的用户进程的时候，为这个结构体开辟相应的内存空间，
+// 把 PID 填进去，然后在对应的用户进程中把它直接映射到用户虚拟内存的某个位置… 这样子就可以在用户态随时访问 PID 信息了。
+
+// 而这个位置呢，已经明示的不能再清楚了，也就是 USYSCALL，
+// 他指向的位置是 TRAPFRAME - PGSIZE，也就是 TRAPFRAME 下面一个页的位置，我们不妨把这个内存页叫做 usyspage：

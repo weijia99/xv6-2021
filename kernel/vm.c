@@ -82,11 +82,12 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
 {
   if(va >= MAXVA)
     panic("walk");
-
+    // 三级页表，9,9,9,12
   for(int level = 2; level > 0; level--) {
     pte_t *pte = &pagetable[PX(level, va)];
     if(*pte & PTE_V) {
       pagetable = (pagetable_t)PTE2PA(*pte);
+      // 得到下一级的页表地址
     } else {
       if(!alloc || (pagetable = (pde_t*)kalloc()) == 0)
         return 0;
@@ -431,4 +432,34 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+
+void pgtblprint(pagetable_t pagetable,int depth){
+  //参考freewalk
+  for (int i = 0; i <512; i++)
+  {
+    /* code */
+    pte_t pte =pagetable[i];
+    if(pte & PTE_V) {
+      for(int t = 0; t < depth; t++){
+        printf(" ..");
+      }
+      printf("%d: pte %p pa %p\n", i, pte, PTE2PA(pte));
+      // 然后进入递归
+      if((pte & (PTE_R|PTE_W|PTE_X)) == 0){
+        // start with new child PTE addr
+        pagetable_t child = (pagetable_t)PTE2PA(pte);
+        pgtblprint(child, depth + 1);
+      }
+  }
+  }
+  
+
+  
+}
+
+void vmprint(pagetable_t pagetable){
+  printf("page table %p\n", pagetable);
+  pgtblprint(pagetable, 1);
 }
