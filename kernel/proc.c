@@ -127,6 +127,14 @@ found:
     return 0;
   }
 
+    // Allocate a trapframe page for alarm backup trapframe
+  if((p->alarm_backup = (struct trapframe *)kalloc()) == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
+  
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
@@ -140,7 +148,10 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+  p->alarm_interval = 0;
+  p->alarm_handler = 0;
+  p->alarm_ticks_left = 0;
+  p->alarm_handler_lock = 0;
   return p;
 }
 
@@ -152,6 +163,8 @@ freeproc(struct proc *p)
 {
   if(p->trapframe)
     kfree((void*)p->trapframe);
+  if (p->alarm_backup) 
+    kfree((void *)p->alarm_backup);
   p->trapframe = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
@@ -164,6 +177,12 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+
+  p->alarm_handler = 0;
+  p->alarm_interval = 0;
+  p->alarm_ticks_left = 0;
+  p->alarm_handler_lock = 0;
+
 }
 
 // Create a user page table for a given process,
@@ -654,3 +673,31 @@ procdump(void)
     printf("\n");
   }
 }
+
+
+// 处理需要时间还有处理器，在proc设置
+//   int alarm_ticks_left;             // How many ticks left before next alarm goes off
+  // int alarm_handler_lock;      // Avoid reentrance of handler function
+// 初始化设置
+  // 开始处理
+
+
+int sigalarm(int ticks, void (*handler)()) {
+  // 这个作用就是进行保存trampframe
+  struct proc *p=myproc();
+  // 传入值
+  p->alarm_interval = ticks;
+  p->alarm_handler = handler;
+  p->alarm_ticks_left = ticks;
+  return 0;
+}
+
+int sigreturn() { 
+  struct proc *p = myproc();
+  // restore trapframe
+  *p->trapframe = *p->alarm_backup;
+  // release reentrant lock
+  p->alarm_handler_lock = 0;
+  return 0;
+}
+

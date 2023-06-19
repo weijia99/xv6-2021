@@ -121,6 +121,7 @@ panic(char *s)
   printf("panic: ");
   printf(s);
   printf("\n");
+   backtrace();
   panicked = 1; // freeze uart output from other CPUs
   for(;;)
     ;
@@ -131,4 +132,22 @@ printfinit(void)
 {
   initlock(&pr.lock, "pr");
   pr.locking = 1;
+}
+// 并在每个栈帧中打印保存的返回地址。
+void backtrace(void){
+  // 通过fp可以获得，返回地址
+  // fp-8就是返回，之前的是fp-16是上一个fp
+  // 从最底部开始寻找
+  printf("backtrace:\n");
+  uint64 fp = r_fp();
+
+  // 通过这个代码获得fp，这是课程给与的
+  // fp不是最上面
+  while(fp !=PGROUNDUP(fp)){
+    // 开始输出
+    uint64 ra =*(uint64*)(fp-8);
+     printf("%p\n", ra);
+    // 查找上一个的fp
+    fp = *(uint64*)(fp-16);
+  }
 }

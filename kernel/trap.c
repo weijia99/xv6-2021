@@ -77,8 +77,27 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2){
+    // 检查是不是已经使用
+      if(p->alarm_interval) { // if alarm is enalbled
+      // 看时间是不是到了
+      if(--p->alarm_ticks_left<=0){
+          if(!p->alarm_handler_lock){
+            // 进行设置ep为handler
+            *p->alarm_backup = *p->trapframe;
+            // 备份，到时候回复，设置ep
+          p->trapframe->epc=(uint64)p->alarm_handler;
+          p->alarm_handler_lock=1;
+      }
+    }}
+
     yield();
+
+  }
+  
+    // 这个函数进行处理始终中断
+
+
 
   usertrapret();
 }
