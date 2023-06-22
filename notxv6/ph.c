@@ -7,7 +7,8 @@
 
 #define NBUCKET 5
 #define NKEYS 100000
-
+// 就是进行对put设置加锁，解决问题
+pthread_mutex_t locks[NBUCKET];
 struct entry {
   int key;
   int value;
@@ -16,7 +17,6 @@ struct entry {
 struct entry *table[NBUCKET];
 int keys[NKEYS];
 int nthread = 1;
-
 
 double
 now()
@@ -39,8 +39,10 @@ insert(int key, int value, struct entry **p, struct entry *n)
 static 
 void put(int key, int value)
 {
+  
   int i = key % NBUCKET;
-
+  // 对每一个bucket上锁
+   pthread_mutex_lock(&locks[i]);
   // is the key already present?
   struct entry *e = 0;
   for (e = table[i]; e != 0; e = e->next) {
@@ -54,6 +56,8 @@ void put(int key, int value)
     // the new is new.
     insert(key, value, &table[i], table[i]);
   }
+  // release
+    pthread_mutex_unlock(&locks[i]);
 
 }
 
@@ -104,12 +108,18 @@ main(int argc, char *argv[])
   pthread_t *tha;
   void *value;
   double t1, t0;
-
-
+  // 初始化锁
   if (argc < 2) {
     fprintf(stderr, "Usage: %s nthreads\n", argv[0]);
     exit(-1);
   }
+  for (size_t i = 0; i < NBUCKET; i++)
+  {
+    /* code */
+  pthread_mutex_init(&locks[i], NULL); 
+
+  }
+  
   nthread = atoi(argv[1]);
   tha = malloc(sizeof(pthread_t) * nthread);
   srandom(0);

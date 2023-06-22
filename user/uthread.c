@@ -10,10 +10,29 @@
 #define STACK_SIZE  8192
 #define MAX_THREAD  4
 
+struct thread_context {
+  uint64 ra;
+  uint64 sp;
 
+  // callee-saved
+  uint64 s0;
+  uint64 s1;
+  uint64 s2;
+  uint64 s3;
+  uint64 s4;
+  uint64 s5;
+  uint64 s6;
+  uint64 s7;
+  uint64 s8;
+  uint64 s9;
+  uint64 s10;
+  uint64 s11;
+};
 struct thread {
   char       stack[STACK_SIZE]; /* the thread's stack */
   int        state;             /* FREE, RUNNING, RUNNABLE */
+  // 加入 context进行保存
+  struct thread_context context; 
 };
 struct thread all_thread[MAX_THREAD];
 struct thread *current_thread;
@@ -39,6 +58,7 @@ thread_schedule(void)
   /* Find another runnable thread. */
   next_thread = 0;
   t = current_thread + 1;
+  // 下一个，循环队列
   for(int i = 0; i < MAX_THREAD; i++){
     if(t >= all_thread + MAX_THREAD)
       t = all_thread;
@@ -53,15 +73,18 @@ thread_schedule(void)
     printf("thread_schedule: no runnable threads\n");
     exit(-1);
   }
-
+  // 完善代码
   if (current_thread != next_thread) {         /* switch threads?  */
     next_thread->state = RUNNING;
     t = current_thread;
     current_thread = next_thread;
+    // c是next，t是之前，然后进行保存现场上下文，进行切换
     /* YOUR CODE HERE
      * Invoke thread_switch to switch from t to next_thread:
      * thread_switch(??, ??);
      */
+    // 上下文进行切换
+    thread_switch((uint64)&t->context, (uint64)&next_thread->context);
   } else
     next_thread = 0;
 }
@@ -76,6 +99,16 @@ thread_create(void (*func)())
   }
   t->state = RUNNABLE;
   // YOUR CODE HERE
+  // 放入到数组里面
+  //  // Set up new context to start executing at forkret,
+  // which returns to user space.
+  // 参考了内核分配proc
+  // memset(&p->context, 0, sizeof(p->context));
+  // p->context.ra = (uint64)forkret;
+  // p->context.sp = p->kstack + PGSIZE;
+  // void (*func)()传入的返回地址，修改ra
+  t->context.ra =(uint64)func;
+  t->context.sp =(uint64)&t->stack + STACK_SIZE;
 }
 
 void 
