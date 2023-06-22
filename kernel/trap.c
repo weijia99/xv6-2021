@@ -67,7 +67,21 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
+  }else if(r_scause()==15||r_scause()==13){
+    // page fault 现在就是更新一个页面
+    //过去page fault 的页面
+    uint64 va =r_stval();
+    // 陷入的ip
+    // 开始调用，失败，就设置kill
+    if (copycow(p->pagetable,va)<0)
+    {
+      /* code */
+      p->killed=1;
+    }
+    
+  }
+  
+   else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;

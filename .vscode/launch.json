@@ -1,0 +1,38 @@
+{
+    "version": "0.2.0",
+      // configuration 包含了 gdb 启动的相关信息
+    "configurations": [
+        {
+            "name": "debug xv6",
+          // 如果没有下载c/pp插件 这个type会报错
+            "type": "cppdbg",
+            "request": "launch",
+          // 你需要的调试的二进制文件 , 默认是kernel/kernel ,因为你先得把xv6启动 你才有机会调试xv6上的用户程序
+            "program": "${workspaceFolder}/kernel/kernel",
+            "args": [],
+          // 是否在kernel的main函数中 打个断点
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}",
+          // make qemu-gdb 会启动一个 gdbserver ,你需要指定一个端口,来连接上这个gdb server, 具体端口可以查看.gdbinit
+            "miDebuggerServerAddress": "localhost:26000",
+          // gdb的路径,  gdb可以是gdb-multiarch 也可以是riscv64-linux-gnu-gdb 具体看你安装的是哪个, 如果是ubuntu的话 
+          // 应该是gdb-multiarch 比较多
+            "miDebuggerPath": "/usr/bin/gdb-multiarch",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "pretty printing",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "logging": {
+                 "engineLogging": true,
+                 "programOutput": true,
+            },
+            // "preLaunchTask": "make-gdb"
+        }
+    ]
+}
