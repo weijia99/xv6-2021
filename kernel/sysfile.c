@@ -15,7 +15,7 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
-
+#define MAX_SYMLINK_DEPTH 10
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -283,6 +283,11 @@ create(char *path, short type, short major, short minor)
   return ip;
 }
 
+
+// 修改op
+// 果被链接的文件也是一个符号链接，我们必须递归地跟踪他，直到到达一个非链接文件。
+// 如果链接形成了一个循环，我们需要返回一个错误代码。我们也可以提前设定一个阈值（例如 10），
+// 当链接的深度到达阈值就返回错误代码来近似地处理这个问题。
 uint64
 sys_open(void)
 {
@@ -345,6 +350,38 @@ sys_open(void)
     itrunc(ip);
   }
 
+  // 加入是软连接,超过10此,直接return
+
+   if(ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)){
+    // 只有这样才进行跟踪
+   int depth = 0;
+    // Follow the symlink recursively
+    while(ip->type == T_SYMLINK){
+      // Return failure if max recursive depth exceeded
+      if(++depth == MAX_SYMLINK_DEPTH){
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+      // Else read new target path from current symlink inode
+      if(readi(ip, 0, (uint64)path, 0, MAXPATH) < 0){
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+      iunlockput(ip);
+      // Check if target is valid
+      if((ip = namei(path)) == 0){
+        end_op();
+        return -1; // target not exist
+      }
+      ilock(ip);
+    }
+    }
+    
+    
+
+   
   iunlock(ip);
   end_op();
 
@@ -483,4 +520,38 @@ sys_pipe(void)
     return -1;
   }
   return 0;
+}
+
+
+uint64 sys_symlink(void){
+
+  struct inode *ip;
+  // 与file有关的
+// 获取参数,argstring
+
+  char target[MAXPATH], path[MAXPATH];
+  int n;
+  // Get params from user space
+  if((n = argstr(0, target, MAXPATH)) < 0 || argstr(1, path, MAXPATH) < 0)
+    return -1;
+
+    // 打开
+     begin_op();
+
+    //  创建inode
+    // create the symlink's inode
+  if((ip = create(path, T_SYMLINK, 0, 0)) == 0) {
+    end_op();
+    return -1;
+  }
+  // write the target path to the inode
+  if(writei(ip, 0, (uint64)target, 0, n) != n) {
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+
+  iunlockput(ip);
+  end_op();
+return 0;
 }
